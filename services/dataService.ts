@@ -91,8 +91,12 @@ const DEFAULT_BATCH_RECORDS: GameBatchRecord[] = [
     { id: 'b-3', date: '2024-03-15', opponent: 'グリーンフォレスト', playerId: '3', playerName: '鈴木 大輔', ab: 4, h: 1, double: 0, triple: 0, hr: 1, bb: 0, ibb: 0, hbp: 0, k: 3, sf: 0, sac: 0, r: 1, rbi: 2, sb: 0, cs: 0, gidp: 0 },
     { id: 'b-4', date: '2024-03-22', opponent: 'ブラックナイツ', playerId: '3', playerName: '鈴木 大輔', ab: 3, h: 0, double: 0, triple: 0, hr: 0, bb: 2, ibb: 0, hbp: 0, k: 1, sf: 0, sac: 0, r: 0, rbi: 0, sb: 0, cs: 0, gidp: 1 },
 
-    // ジョンソン: God mode
-    { id: 'b-5', date: '2024-03-15', opponent: 'グリーンフォレスト', playerId: '4', playerName: 'R. ジョンソン', ab: 3, h: 2, double: 1, triple: 0, hr: 1, bb: 2, ibb: 1, hbp: 0, k: 0, sf: 0, sac: 0, r: 3, rbi: 4, sb: 0, cs: 0, gidp: 0 },
+    // ジョンソン: God mode with IBBs
+    // NOTE: 'bb' is Total Walks. 'ibb' is Intentional Walks (subset).
+    // Correct Logic: PA = AB + BB (Total) + HBP + SF + SAC.
+    // Here: 3 (AB) + 3 (BB) + 1 (HBP) = 7 PA. 
+    // Of the 3 BBs, 2 were Intentional. This logic holds up (BB >= IBB).
+    { id: 'b-5', date: '2024-03-15', opponent: 'グリーンフォレスト', playerId: '4', playerName: 'R. ジョンソン', ab: 3, h: 2, double: 1, triple: 0, hr: 1, bb: 3, ibb: 2, hbp: 1, k: 0, sf: 0, sac: 0, r: 3, rbi: 4, sb: 0, cs: 0, gidp: 0 },
 ];
 
 // Sample Pitcher Records (Batch - Historical Games)
@@ -133,6 +137,33 @@ const DEFAULT_PITCHER_PLAY_RECORDS: PitcherPlayRecord[] = [
     { id: 'pp-5', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', opponent: 'レッドスターズ', playerId: '11', playerName: '伊藤 投手', inning: 2, result: 'HR', isOut: false, runScored: 2, earnedRun: 2, coordX: 10, coordY: 10, vsHand: 'R' }, // 2-run HR to LF
     // FIX: pp-6 had earnedRun: 2 on a Fly Out. Should be 0.
     { id: 'pp-6', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', opponent: 'レッドスターズ', playerId: '11', playerName: '伊藤 投手', inning: 2, result: 'FO', isOut: true, runScored: 0, earnedRun: 0, coordX: 50, coordY: 80, vsHand: 'R' },
+];
+
+// Sample Pitch Records (Detailed)
+// Linked to Plate Appearances (Batter) or PitcherPlayRecords (Pitcher)
+const DEFAULT_PITCH_RECORDS: PitchRecord[] = [
+    // --- pa-1 (Sato 2B) ---
+    // Pitcher: Unknown (Opponent)
+    { id: 'pr-1', paId: 'pa-1', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: '1', pitcherId: 'unknown', pitchNumber: 1, zone: 11, pitchType: 'Straight', speed: 135, result: 'CalledStrike', ballCount: 0, strikeCount: 0, outCount: 0, inning: 1 },
+    { id: 'pr-2', paId: 'pa-1', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: '1', pitcherId: 'unknown', pitchNumber: 2, zone: 21, pitchType: 'Curve', speed: 110, result: 'Ball', ballCount: 0, strikeCount: 1, outCount: 0, inning: 1 },
+    { id: 'pr-3', paId: 'pa-1', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: '1', pitcherId: 'unknown', pitchNumber: 3, zone: 13, pitchType: 'Straight', speed: 138, result: 'InPlay', ballCount: 1, strikeCount: 1, outCount: 0, inning: 1 },
+
+    // --- pa-3 (Suzuki HR) ---
+    { id: 'pr-4', paId: 'pa-3', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: '3', pitcherId: 'unknown', pitchNumber: 1, zone: 12, pitchType: 'Slider', speed: 125, result: 'InPlay', ballCount: 0, strikeCount: 0, outCount: 0, inning: 1 },
+
+    // --- pa-4 (Johnson SO) ---
+    { id: 'pr-5', paId: 'pa-4', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: '4', pitcherId: 'unknown', pitchNumber: 1, zone: 6, pitchType: 'Straight', speed: 142, result: 'SwingingStrike', ballCount: 0, strikeCount: 0, outCount: 0, inning: 1 },
+    { id: 'pr-6', paId: 'pa-4', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: '4', pitcherId: 'unknown', pitchNumber: 2, zone: 14, pitchType: 'Split', speed: 130, result: 'Foul', ballCount: 0, strikeCount: 1, outCount: 0, inning: 1 },
+    { id: 'pr-7', paId: 'pa-4', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: '4', pitcherId: 'unknown', pitchNumber: 3, zone: 23, pitchType: 'Split', speed: 128, result: 'SwingingStrike', ballCount: 0, strikeCount: 2, outCount: 0, inning: 1 },
+
+    // --- pp-1 (Ito SO) ---
+    // Batter: Unknown (Opponent)
+    { id: 'pr-8', paId: 'pp-1', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: 'unknown', pitcherId: '11', pitchNumber: 1, zone: 12, pitchType: 'Straight', speed: 145, result: 'CalledStrike', ballCount: 0, strikeCount: 0, outCount: 0, inning: 1 },
+    { id: 'pr-9', paId: 'pp-1', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: 'unknown', pitcherId: '11', pitchNumber: 2, zone: 17, pitchType: 'Slider', speed: 128, result: 'SwingingStrike', ballCount: 0, strikeCount: 1, outCount: 0, inning: 1 },
+    { id: 'pr-10', paId: 'pp-1', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: 'unknown', pitcherId: '11', pitchNumber: 3, zone: 22, pitchType: 'Split', speed: 132, result: 'SwingingStrike', ballCount: 0, strikeCount: 2, outCount: 0, inning: 1 },
+
+    // --- pp-2 (Ito GO) ---
+    { id: 'pr-11', paId: 'pp-2', gameId: '2024-04-01-レッドスターズ', date: '2024-04-01', batterId: 'unknown', pitcherId: '11', pitchNumber: 1, zone: 18, pitchType: 'Sinker', speed: 140, result: 'InPlay', ballCount: 0, strikeCount: 0, outCount: 1, inning: 1 },
 ];
 
 
@@ -290,7 +321,7 @@ export const deletePitcherPlayRecord = (id: string): void => {
 export const getPitchRecords = (): PitchRecord[] => {
     const stored = localStorage.getItem(STORAGE_KEY_PITCHES);
     if (stored) return JSON.parse(stored);
-    return [];
+    return DEFAULT_PITCH_RECORDS; // Return default if empty
 };
 export const savePitchRecords = (records: PitchRecord[]): void => {
     const current = getPitchRecords();

@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PlateAppearance, GameBatchRecord, BatterStats, PitcherStats, Player, Opponent, PitchRecord, PitcherPlayRecord } from '../types';
 import { getPARecords, getBatchRecords, getPitcherRecords, exportUnifiedCSV, getPlayers, getOpponents, getPitchRecords, getPitcherPlayRecords } from '../services/dataService';
 import { calculateBatterStats, calculatePitcherStats, calculateLeagueStats, formatStat, analyzePitchData, PitchAnalysis, ZoneStats } from '../services/statsService';
-import { Download, BarChart2, TrendingUp, RefreshCw, User, Target, MapPin, Calendar, Activity, Info, Filter, Shield, Swords, Crown, Medal, BookOpen, ArrowRight, Grid3X3, Flame } from 'lucide-react';
+import { Download, BarChart2, TrendingUp, RefreshCw, User, Target, MapPin, Calendar, Activity, Info, Filter, Shield, Swords, Crown, Medal, BookOpen, ArrowRight, Grid3X3, Flame, XCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, CartesianGrid, Legend } from 'recharts';
 import { MetricsGuideModal } from './MetricsGuideModal';
 
@@ -39,6 +39,10 @@ export const Dashboard: React.FC = () => {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('ALL'); // 'ALL' or UUID
   const [selectedOpponent, setSelectedOpponent] = useState<string>(''); // Opponent Name
   
+  // Advanced Filter State (Matchups)
+  const [filterVsHand, setFilterVsHand] = useState<'All' | 'R' | 'L'>('All');
+  const [filterVsPlayerId, setFilterVsPlayerId] = useState<string>('ALL'); // Specific opposing player ID
+
   // Spray Chart Data
   const [sprayData, setSprayData] = useState<Array<{x: number, y: number, result: string, isHit: boolean}>>([]);
   const [pitcherSprayData, setPitcherSprayData] = useState<Array<{x: number, y: number, result: string, isOut: boolean}>>([]);
@@ -57,11 +61,17 @@ export const Dashboard: React.FC = () => {
     loadData();
   }, [filterType, selectedMonth, customStart, customEnd, mode, selectedOpponent]);
 
+  // Effect: Reset Advanced Filters when Main Player changes
+  useEffect(() => {
+      setFilterVsHand('All');
+      setFilterVsPlayerId('ALL');
+  }, [selectedPlayerId, view]);
+
   // Effect: When Stats or Selected Player changes, update Charts (Spray & Trend)
   useEffect(() => {
       updateCharts();
       updatePitchAnalysis();
-  }, [selectedPlayerId, batterStats, pitcherStats, view, trendMetric]);
+  }, [selectedPlayerId, batterStats, pitcherStats, view, trendMetric, filterVsHand, filterVsPlayerId]);
 
   // Date Filtering Logic
   const isInDateRange = (dateStr: string) => {
@@ -249,7 +259,7 @@ export const Dashboard: React.FC = () => {
   const updatePitchAnalysis = () => {
       // Fetch Raw Data
       let pitches = getPitchRecords();
-      let paRecords: PlateAppearance[] | PitcherPlayRecord[] = [];
+      let paRecords: (PlateAppearance | PitcherPlayRecord)[] = [];
 
       // Filter by Common Criteria (Date/Opponent)
       if (mode === 'team') {
@@ -278,13 +288,75 @@ export const Dashboard: React.FC = () => {
           paRecords = pp;
       }
 
+      // --- APPLY NEW FILTERS (Matchup) ---
+      
+      // 1. Vs Player Filter
+      if (filterVsPlayerId !== 'ALL') {
+          if (view === 'batter') {
+              pitches = pitches.filter(p => p.pitcherId === filterVsPlayerId);
+          } else {
+              pitches = pitches.filter(p => p.batterId === filterVsPlayerId);
+          }
+      }
+
+      // 2. Vs Hand Filter
+      if (filterVsHand !== 'All') {
+          // Map PA Records for O(1) lookup
+          const paMap = new Map<string, PlateAppearance | PitcherPlayRecord>();
+          paRecords.forEach(r => paMap.set(r.id, r));
+
+          pitches = pitches.filter(p => {
+              const pa = paMap.get(p.paId);
+              if (!pa || !pa.vsHand) return false;
+              return pa.vsHand === filterVsHand;
+          });
+      }
+
       if (pitches.length === 0) {
           setPitchAnalysis(null);
           return;
       }
 
-      const analysis = analyzePitchData(pitches, paRecords);
+      const analysis = analyzePitchData(pitches, paRecords as any);
       setPitchAnalysis(analysis);
+  };
+
+  // Helper to get available opponents for the dropdown
+  const getAvailableMatchups = () => {
+      // 1. Get current base pitches (before matchup filtering)
+      let pitches = getPitchRecords();
+      if (mode === 'team') pitches = pitches.filter(p => isInDateRange(p.date));
+      else if (selectedOpponent) pitches = pitches.filter(p => p.gameId.includes(selectedOpponent));
+
+      // 2. Filter by current subject
+      if (selectedPlayerId !== 'ALL') {
+          if (view === 'batter') pitches = pitches.filter(p => p.batterId === selectedPlayerId);
+          else pitches = pitches.filter(p => p.pitcherId === selectedPlayerId);
+      }
+
+      // 3. Extract unique opponents
+      const opponentIds = new Set<string>();
+      pitches.forEach(p => {
+          const oppId = view === 'batter' ? p.pitcherId : p.batterId;
+          if (oppId) opponentIds.add(oppId);
+      });
+
+      // 4. Map to Names
+      const players = getPlayers();
+      const results: {id: string, name: string}[] = [];
+      opponentIds.forEach(id => {
+          if (id === 'unknown' || !id) {
+              results.push({ id: 'unknown', name: '不明/その他' });
+          } else {
+              const p = players.find(pl => pl.id === id);
+              if (p) results.push({ id: p.id, name: p.name });
+              else results.push({ id: id, name: '未登録選手' }); // Or maybe an opponent name
+          }
+      });
+      
+      // Deduplicate by name just in case
+      const uniqueResults = results.filter((v,i,a)=>a.findIndex(t=>(t.id === v.id))===i);
+      return uniqueResults;
   };
 
   const calculateTrends = (playerId: string) => {
@@ -375,6 +447,17 @@ export const Dashboard: React.FC = () => {
       setTrendData(chartData);
   };
 
+  // Helper for fixed domain ranges
+  const getTrendDomain = (metric: TrendMetric): [number | string, number | string] => {
+      switch(metric) {
+          case 'avg': return [0, 0.6];  // Fix max to .600
+          case 'ops': return [0, 1.5];  // Fix max to 1.500
+          case 'era': return [0, 10];   // Fix max to 10.00
+          case 'whip': return [0, 3];   // Fix max to 3.00
+          default: return ['auto', 'auto'];
+      }
+  };
+
   const getOpsColor = (ops: number) => {
     if (ops >= 1.000) return 'text-red-600 font-extrabold';
     if (ops >= 0.800) return 'text-team-red font-bold';
@@ -390,32 +473,6 @@ export const Dashboard: React.FC = () => {
       if (qualified.length === 0) return stats[0];
       return qualified.sort((a,b) => (b[key] as number) - (a[key] as number))[0];
   };
-
-  // Sabermetrics MVP: Best RCWIN (Batter) / RSWIN (Pitcher)
-  const getSaberMvpBatter = () => {
-      if (batterStats.length === 0) return null;
-      return [...batterStats].sort((a,b) => b.rcwin - a.rcwin)[0];
-  };
-  const getSaberMvpPitcher = () => {
-      if (pitcherStats.length === 0) return null;
-      return [...pitcherStats].sort((a,b) => b.rswin - a.rswin)[0];
-  };
-
-  const saberMvpB = getSaberMvpBatter();
-  const saberMvpP = getSaberMvpPitcher();
-
-  // For Scouting Mode - Find Killer Players
-  const getKillerBatter = () => {
-      if (batterStats.length === 0) return null;
-      return [...batterStats].sort((a, b) => b.ops - a.ops)[0];
-  };
-  
-  const getKillerPitcher = () => {
-      if (pitcherStats.length === 0) return null;
-      return [...pitcherStats].sort((a, b) => a.era - b.era)[0]; // Lower is better
-  };
-
-  const killerB = getKillerBatter();
 
   const getCurrentPlayerName = () => {
       if (selectedPlayerId === 'ALL') return 'チーム全体';
@@ -687,7 +744,7 @@ export const Dashboard: React.FC = () => {
                                           <LineChart data={trendData}>
                                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                               <XAxis dataKey="date" tick={{fontSize: 10}} />
-                                              <YAxis domain={['auto', 'auto']} tick={{fontSize: 10}} />
+                                              <YAxis domain={getTrendDomain(trendMetric)} tick={{fontSize: 10}} />
                                               <Tooltip labelStyle={{color:'black'}} />
                                               <Line type="monotone" dataKey="value" stroke="#0f172a" strokeWidth={2} dot={{r:3}} />
                                           </LineChart>
@@ -768,19 +825,58 @@ export const Dashboard: React.FC = () => {
 
               {/* --- ADVANCED TAB --- */}
               {activeTab === 'advanced' && (
-                  <div className="animate-in fade-in space-y-8">
+                  <div className="animate-in fade-in space-y-6">
+                      
+                      {/* NEW: Matchup Filter Bar */}
+                      <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4 shadow-inner">
+                          <div className="flex items-center gap-2">
+                              <Swords size={18} className="text-slate-500"/>
+                              <span className="text-xs font-bold text-slate-500">対戦条件フィルター:</span>
+                          </div>
+                          
+                          {/* Vs Hand */}
+                          <div className="flex items-center bg-white rounded-lg border p-1">
+                              <span className="text-[10px] font-bold px-2 text-slate-400">相手の利き腕</span>
+                              <div className="flex gap-1 ml-1">
+                                  <button onClick={()=>setFilterVsHand('All')} className={`px-3 py-1 text-xs font-bold rounded ${filterVsHand==='All'?'bg-slate-800 text-white':'bg-slate-100 hover:bg-slate-200'}`}>全て</button>
+                                  <button onClick={()=>setFilterVsHand('R')} className={`px-3 py-1 text-xs font-bold rounded ${filterVsHand==='R'?'bg-slate-800 text-white':'bg-slate-100 hover:bg-slate-200'}`}>右</button>
+                                  <button onClick={()=>setFilterVsHand('L')} className={`px-3 py-1 text-xs font-bold rounded ${filterVsHand==='L'?'bg-slate-800 text-white':'bg-slate-100 hover:bg-slate-200'}`}>左</button>
+                              </div>
+                          </div>
+
+                          {/* Vs Player */}
+                          <div className="flex items-center gap-2">
+                              <select 
+                                  value={filterVsPlayerId}
+                                  onChange={(e) => setFilterVsPlayerId(e.target.value)}
+                                  className="p-1.5 border rounded-lg text-xs font-bold bg-white min-w-[150px]"
+                              >
+                                  <option value="ALL">対戦選手: 全て</option>
+                                  {getAvailableMatchups().map(m => (
+                                      <option key={m.id} value={m.id}>{m.name}</option>
+                                  ))}
+                              </select>
+                          </div>
+                      </div>
+
                       {!pitchAnalysis ? (
                           <div className="text-center py-20 text-slate-400 bg-slate-50 rounded-xl border border-dashed">
-                              投球詳細データ（ゾーン・球種）がありません
+                              該当する投球データがありません
                           </div>
                       ) : (
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                               {/* Left: Heatmap */}
                               <div className="bg-white rounded-xl p-6 border shadow-sm">
                                   <div className="flex justify-between items-center mb-6">
-                                      <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                                          <Grid3X3 size={20}/> ゾーン別ヒートマップ
-                                      </h3>
+                                      <div>
+                                          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                                              <Grid3X3 size={20}/> ゾーン別ヒートマップ
+                                          </h3>
+                                          <p className="text-xs text-slate-400 mt-1">
+                                              vs {filterVsHand === 'All' ? '全' : filterVsHand === 'R' ? '右' : '左'}{view === 'batter' ? '投手' : '打者'} 
+                                              {filterVsPlayerId !== 'ALL' && ` (vs ${getAvailableMatchups().find(m=>m.id===filterVsPlayerId)?.name || ''})`}
+                                          </p>
+                                      </div>
                                       <select 
                                           value={heatmapMetric} 
                                           onChange={(e) => setHeatmapMetric(e.target.value as any)}

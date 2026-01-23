@@ -242,7 +242,8 @@ export enum TabView {
   DASHBOARD = 'DASHBOARD',
   DATA = 'DATA',
   SETTINGS = 'SETTINGS',
-  VIEWER = 'VIEWER', // Added Viewer Tab
+  VIEWER = 'VIEWER',
+  HELP = 'HELP', // Added Help Tab
 }
 
 // Viewer Data Type

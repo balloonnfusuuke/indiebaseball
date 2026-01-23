@@ -4,8 +4,9 @@ import { InputForm } from './components/InputForm';
 import { Dashboard } from './components/Dashboard';
 import { Settings } from './components/Settings';
 import { HistoryTab } from './components/HistoryTab';
+import { HelpPage } from './components/HelpPage'; // New Import
 import { TabView } from './types';
-import { Edit3, BarChart2, Database, BrainCircuit, Settings as SettingsIcon } from 'lucide-react';
+import { Edit3, BarChart2, Database, BrainCircuit, Settings as SettingsIcon, BookOpen } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabView>(TabView.INPUT);
@@ -29,6 +30,9 @@ const App: React.FC = () => {
               <button onClick={() => setActiveTab(TabView.SETTINGS)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${activeTab===TabView.SETTINGS ? 'bg-white text-team-navy' : 'text-slate-300 hover:bg-white/10'}`}>
                   <SettingsIcon size={20}/> 設定・登録
               </button>
+              <button onClick={() => setActiveTab(TabView.HELP)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${activeTab===TabView.HELP ? 'bg-white text-team-navy' : 'text-slate-300 hover:bg-white/10'}`}>
+                  <BookOpen size={20}/> 使い方ガイド
+              </button>
           </nav>
 
           {/* Mobile Header (Only visible on small screens) */}
@@ -38,6 +42,7 @@ const App: React.FC = () => {
                  <button onClick={() => setActiveTab(TabView.DASHBOARD)} className={activeTab===TabView.DASHBOARD ? 'text-white border-b-2 border-white pb-1' : 'text-slate-400'}>分析</button>
                  <button onClick={() => setActiveTab(TabView.DATA)} className={activeTab===TabView.DATA ? 'text-white border-b-2 border-white pb-1' : 'text-slate-400'}>履歴</button>
                  <button onClick={() => setActiveTab(TabView.SETTINGS)} className={activeTab===TabView.SETTINGS ? 'text-white border-b-2 border-white pb-1' : 'text-slate-400'}>設定</button>
+                 <button onClick={() => setActiveTab(TabView.HELP)} className={activeTab===TabView.HELP ? 'text-white border-b-2 border-white pb-1' : 'text-slate-400'}>ガイド</button>
              </div>
           </div>
 
@@ -64,6 +69,7 @@ const App: React.FC = () => {
             {activeTab === TabView.DASHBOARD && <Dashboard />}
             {activeTab === TabView.DATA && <HistoryTab />}
             {activeTab === TabView.SETTINGS && <Settings />}
+            {activeTab === TabView.HELP && <HelpPage />}
         </div>
       </main>
 
